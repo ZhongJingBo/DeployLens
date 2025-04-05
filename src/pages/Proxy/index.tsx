@@ -5,7 +5,7 @@ import { Plus, X } from 'lucide-react';
 import { ProxyProvider, useProxy } from './context/ProxyContext';
 import Editor from './components/editor';
 import { proxyGroupStatus } from '@/model/proxy';
-import { jsoncTransformProxyRule } from './utils';
+import { jsoncTransformProxyRule, commentProxyRuleById } from './utils';
 import SettingsComp from './components/settingsComp';
 import ProxyTable from './components/table';
 const ProxyContent: React.FC = () => {
@@ -64,21 +64,22 @@ const ProxyContent: React.FC = () => {
   const handleRuleStatusChange = (ruleId: number, enabled: boolean) => {
     const newData = { ...state.proxyData };
     const currentTabData = { ...newData[state.currentTab] };
-    const updatedRules = currentTabData.rule.map(rule => 
+    const updatedRules = currentTabData.rule.map(rule =>
       rule.id === ruleId ? { ...rule, enabled } : rule
     );
-    
+    const commentedJsonc = commentProxyRuleById(ruleId, currentTabData.jsonc || '' ,enabled );
+    console.log('commentedJsonc', commentedJsonc);
     dispatch({
       type: 'UPDATE_PROXY_DATA',
       payload: {
         key: state.currentTab,
         data: {
           rule: updatedRules,
-          jsonc: currentTabData.jsonc || ''
-        }
-      }
+          jsonc: commentedJsonc || '',
+        },
+      },
     });
-  };  
+  };
 
   return (
     <div>
@@ -167,10 +168,7 @@ const ProxyContent: React.FC = () => {
             {mode === 'editor' ? (
               <Editor value={state.proxyData[key].jsonc || ''} onChange={editorUpdateChange} />
             ) : (
-              <ProxyTable
-                data={state.proxyData[key]}
-                onRuleStatusChange={handleRuleStatusChange}
-              />
+              <ProxyTable data={state.proxyData[key]} onRuleStatusChange={handleRuleStatusChange} />
             )}
           </TabsContent>
         ))}
