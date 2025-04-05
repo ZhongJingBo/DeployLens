@@ -1,5 +1,5 @@
 import { ProxyRule } from '@/model/proxy';
-import { parseTree, ParseOptions, Node, visit, NodeType } from 'jsonc-parser';
+import { parseTree, ParseOptions, Node, visit } from 'jsonc-parser';
 /**
  * 移除 JSON 中的注释
  * @param str
@@ -130,7 +130,7 @@ function findCommentedProxyRules(text: string, node: Node | undefined): ProxyRul
   let inProxyArray = false;
   let currentCommentLines: string[] = [];
   let isCollectingComment = false;
-  const COMMENTED_ID_OFFSET = 10000; // Large offset to avoid conflicts with uncommented rules
+  // const COMMENTED_ID_OFFSET = 10000; // Large offset to avoid conflicts with uncommented rules
 
   // 访问 AST
   visit(text, {
@@ -198,7 +198,7 @@ function findCommentedProxyRules(text: string, node: Node | undefined): ProxyRul
     try {
       if (currentCommentLines.length === 2) {
         commentedRules.push({
-          id: COMMENTED_ID_OFFSET + commentedRules.length, // Add offset to ensure unique IDs
+          id: commentedRules.length + 1, // Add offset to ensure unique IDs
           pattern: currentCommentLines[0],
           target: currentCommentLines[1],
           enabled: false,
@@ -232,7 +232,7 @@ const processLine = (line: string): LineInfo => {
     original: line,
     trimmed,
     uncommented: trimmed.replace(/^\s*\/\/\s*/, ''),
-    indent: line.match(/^\s*/)?.[0] || ''
+    indent: line.match(/^\s*/)?.[0] || '',
   };
 };
 
@@ -317,7 +317,7 @@ const processComments = (
 ): void => {
   for (let i = range.start; i <= range.end; i++) {
     const lineInfo = processLine(lines[i]);
-    
+
     // 跳过空行
     if (!lineInfo.trimmed) continue;
 

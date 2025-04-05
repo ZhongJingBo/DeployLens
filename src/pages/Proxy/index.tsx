@@ -68,7 +68,7 @@ const ProxyContent: React.FC = () => {
       rule.id === ruleId ? { ...rule, enabled } : rule
     );
     const commentedJsonc = commentProxyRuleById(ruleId, currentTabData.jsonc || '' ,enabled );
-    console.log('commentedJsonc', commentedJsonc);
+    console.log('commentedJsonc', commentedJsonc ,updatedRules);
     dispatch({
       type: 'UPDATE_PROXY_DATA',
       payload: {
