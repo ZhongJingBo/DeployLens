@@ -24,6 +24,8 @@ export const parseUrlAndQueryParams = (
   };
 };
 
+
+
 /**
  * 复制基础URL
  * @param baseUrl 基础URL
@@ -32,6 +34,9 @@ export const handleCopyBaseUrl = (baseUrl: string) => {
   navigator.clipboard.writeText(baseUrl);
 };
 
+
+
+
 /**
  * 复制查询参数
  * @param queryParams 查询参数
@@ -39,6 +44,9 @@ export const handleCopyBaseUrl = (baseUrl: string) => {
 export const handleCopyQueryParams = (queryParams: Record<string, string>[]) => {
   navigator.clipboard.writeText(JSON.stringify(queryParams));
 };
+
+
+
 
 /**
  * 替换URL

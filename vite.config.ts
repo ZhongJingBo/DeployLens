@@ -28,6 +28,7 @@ export default defineConfig({
         { src: 'manifest.json', dest: 'dist' },
         { src: 'service-worker.js', dest: 'dist' },
         { src: 'lib', dest: 'dist' },
+        { src: 'content-scripts', dest: 'dist' },
       ],
       hook: 'writeBundle',
     }),
@@ -39,6 +40,7 @@ export default defineConfig({
       '@components': path.resolve(__dirname, 'src/components'),
       '@utils': path.resolve(__dirname, 'src/utils'),
       '@hooks': path.resolve(__dirname, 'src/hooks'),
+      '@constants': path.resolve(__dirname, 'src/constants'),
     },
   },
   server: {
@@ -59,12 +61,12 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
-        // background: path.resolve(__dirname, 'src/background/requestForward.js'),
+        // contentScript: path.resolve(__dirname, 'src/content-scripts/getScripts.ts'),
       },
       output: {
         // entryFileNames: (chunkInfo: { name: string }) => {
-        //   return chunkInfo.name === 'background'
-        //     ? 'background/requestForward.js'
+        //   return chunkInfo.name === 'contentScript'
+        //     ? 'content-scripts.js'
         //     : 'assets/js/[name].js';
         // },
         chunkFileNames: 'assets/js/[name].js',

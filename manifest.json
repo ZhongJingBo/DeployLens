@@ -7,6 +7,13 @@
   "background": {
     "service_worker": "service-worker.js"
   },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-scripts/getScripts.js"],
+      "run_at": "document_start"
+    }
+  ],
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
@@ -23,7 +30,9 @@
     "sidePanel",
     "storage",
     "declarativeNetRequest",
-    "declarativeNetRequestFeedback"
+    "declarativeNetRequestFeedback",
+    "activeTab",
+    "scripting"
   ],
   "host_permissions": [
     "<all_urls>"

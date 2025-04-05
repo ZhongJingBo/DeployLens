@@ -1,4 +1,4 @@
-import { Inbox, Search, Settings, LucideIcon, Link, Globe } from 'lucide-react';
+import { Search, Settings, LucideIcon, Link, Globe } from 'lucide-react';
 
 // Define route configuration type
 export interface RouteConfig {
@@ -10,7 +10,7 @@ export interface RouteConfig {
 
 // Import page components
 import ReplaceLink from '../pages/ReplaceLink';
-import RequestForward from '../pages/RequestForward';
+import Proxy from '../pages/Proxy';
 import SearchPage from '../pages/Search';
 import SettingsPage from '../pages/Settings';
 
@@ -26,7 +26,7 @@ export const routes: RouteConfig[] = [
     title: '代理',
     path: '/proxy',
     icon: Globe,
-    component: RequestForward,
+    component: Proxy,
   },
 
   {

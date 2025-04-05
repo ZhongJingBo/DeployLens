@@ -1,4 +1,4 @@
-import { STORE_LINK_KEY, CHFONE_STORE_LINK_KEY, DEVELOPMENT_STORELINK } from '@/constants';
+import {CHFONE_STORE_LINK_KEY, DEVELOPMENT_STORELINK } from '@/constants';
 import { isDev } from '@/utils/env';
 
 /**

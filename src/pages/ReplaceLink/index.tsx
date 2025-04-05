@@ -53,7 +53,7 @@ const ReplaceLink: React.FC = () => {
         initData();
       }
     };
-    console.log(isProd(), 'isProd');
+
     if (isProd()) {
       chrome.tabs.onActivated.addListener(handleTabActivated);
       chrome.tabs.onUpdated.addListener(handleTabUpdated);
@@ -313,8 +313,3 @@ const ReplaceLink: React.FC = () => {
 
 export default ReplaceLink;
 
-/**
- * 传入 baseUrl 和 queryParams 以及key 展示➕ 下拉按钮
- *
- * ChevronDown  ChevronUp Plus
- */
