@@ -76,7 +76,7 @@ export const cleanJSON = (str: string): string => {
 };
 
 // 辅助函数：验证和转换规则
-export const validateAndTransformRules = (rules: any[]) => {
+export function validateAndTransformRules(rules: any[]): ProxyRule[] {
   if (!Array.isArray(rules)) {
     throw new Error('proxy must be an array');
   }
@@ -95,7 +95,7 @@ export const validateAndTransformRules = (rules: any[]) => {
       target: target?.trim() || '',
       enabled: true,
     }));
-};
+}
 
 /**
  * jsonc 转换为对象结构
@@ -130,6 +130,7 @@ function findCommentedProxyRules(text: string, node: Node | undefined): ProxyRul
   let inProxyArray = false;
   let currentCommentLines: string[] = [];
   let isCollectingComment = false;
+  const COMMENTED_ID_OFFSET = 10000; // Large offset to avoid conflicts with uncommented rules
 
   // 访问 AST
   visit(text, {
@@ -197,7 +198,7 @@ function findCommentedProxyRules(text: string, node: Node | undefined): ProxyRul
     try {
       if (currentCommentLines.length === 2) {
         commentedRules.push({
-          id: commentedRules.length,
+          id: COMMENTED_ID_OFFSET + commentedRules.length, // Add offset to ensure unique IDs
           pattern: currentCommentLines[0],
           target: currentCommentLines[1],
           enabled: false,
@@ -215,197 +216,161 @@ function findCommentedProxyRules(text: string, node: Node | undefined): ProxyRul
   return commentedRules;
 }
 
+interface LineInfo {
+  original: string;
+  trimmed: string;
+  uncommented: string;
+  indent: string;
+}
+
+/**
+ * 处理单行内容，返回行信息
+ */
+const processLine = (line: string): LineInfo => {
+  const trimmed = line.trim();
+  return {
+    original: line,
+    trimmed,
+    uncommented: trimmed.replace(/^\s*\/\/\s*/, ''),
+    indent: line.match(/^\s*/)?.[0] || ''
+  };
+};
+
+/**
+ * 查找目标规则的范围
+ */
+const findRuleRange = (
+  lines: string[],
+  ruleId: number,
+  startIndex: number
+): { start: number; end: number } | null => {
+  let currentRuleIndex = -1;
+  let bracketCount = 0;
+  let inRule = false;
+  let foundFirstBracket = false;
+
+  for (let i = startIndex; i < lines.length; i++) {
+    const lineInfo = processLine(lines[i]);
+
+    // 跳过proxy数组声明行
+    if (lineInfo.uncommented.includes('"proxy"')) {
+      continue;
+    }
+
+    // 找到proxy数组的开始
+    if (!foundFirstBracket && lineInfo.uncommented === '[') {
+      foundFirstBracket = true;
+      continue;
+    }
+
+    // 检测规则开始
+    if (foundFirstBracket && lineInfo.uncommented.startsWith('[')) {
+      currentRuleIndex++;
+      if (currentRuleIndex === ruleId) {
+        inRule = true;
+        bracketCount = 1;
+        return findRuleEnd(lines, i, bracketCount);
+      }
+    }
+  }
+
+  return null;
+};
+
+/**
+ * 查找规则的结束位置
+ */
+const findRuleEnd = (
+  lines: string[],
+  startIndex: number,
+  initialBracketCount: number
+): { start: number; end: number } | null => {
+  let bracketCount = initialBracketCount;
+
+  for (let i = startIndex; i < lines.length; i++) {
+    const lineInfo = processLine(lines[i]);
+
+    // 在规则内部时，检测嵌套的方括号
+    if (!lineInfo.uncommented.startsWith('[') && lineInfo.uncommented.includes('[')) {
+      bracketCount++;
+    }
+
+    // 检测规则结束
+    if (lineInfo.uncommented.includes(']')) {
+      bracketCount--;
+      if (bracketCount === 0) {
+        return { start: startIndex, end: i };
+      }
+    }
+  }
+
+  return null;
+};
+
+/**
+ * 处理注释操作
+ */
+const processComments = (
+  lines: string[],
+  range: { start: number; end: number },
+  enabled: boolean
+): void => {
+  for (let i = range.start; i <= range.end; i++) {
+    const lineInfo = processLine(lines[i]);
+    
+    // 跳过空行
+    if (!lineInfo.trimmed) continue;
+
+    if (!enabled) {
+      // 添加注释
+      if (!lineInfo.trimmed.startsWith('//')) {
+        lines[i] = lineInfo.indent + '// ' + lineInfo.trimmed;
+      }
+    } else {
+      // 移除注释
+      lines[i] = lineInfo.indent + lineInfo.uncommented;
+    }
+  }
+};
+
 /**
  * 根据规则ID注释对应的proxy规则
  * @param ruleId 规则ID
  * @param jsoncContent JSONC内容
  * @param enabled 是否启用，true表示移除注释，false表示添加注释
- * @returns 注释后的JSONC内容
- * 
+ * @returns 修改后的JSONC内容
+ * @throws {Error} 当找不到proxy数组或目标规则时抛出错误
  */
-export const commentProxyRuleById = (ruleId: number, jsoncContent: string, enabled: boolean): string => {
-  // 解析 JSONC 内容
-  const parseOptions: ParseOptions = {
-    disallowComments: false,
-    allowTrailingComma: true,
-    allowEmptyContent: true,
-  };
-  
-  // 解析 AST
-  const ast = parseTree(jsoncContent, undefined, parseOptions);
-  
-  if (!ast) {
-    return jsoncContent;
+export const commentProxyRuleById = (
+  ruleId: number,
+  jsoncContent: string,
+  enabled: boolean
+): string => {
+  // 输入验证
+  if (typeof ruleId !== 'number' || ruleId < 0) {
+    throw new Error('Invalid rule ID');
   }
-  
-  // 查找指定 ID 的规则
-  const rules = jsoncTransformProxyRule(jsoncContent);
-  const targetRule = rules.find(rule => rule.id === ruleId);
-  
-  if (!targetRule) {
-    return jsoncContent;
+
+  if (typeof jsoncContent !== 'string' || !jsoncContent.trim()) {
+    throw new Error('Invalid JSONC content');
   }
-  
-  // 在 JSONC 内容中搜索目标规则
+
   const lines = jsoncContent.split('\n');
-  const rulePattern = `"${targetRule.pattern}"`;
-  const ruleTarget = `"${targetRule.target}"`;
-  
-  // 查找需要处理的规则的范围
-  let startLine = -1;
-  let endLine = -1;
-  let bracketCount = 0;
-  
-  // 查找规则的位置
-  // 如果 enabled=false（添加注释），我们查找未注释的行
-  // 如果 enabled=true（移除注释），我们查找已注释的行
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const uncommentedLine = line.replace(/^\s*\/\/\s*/, ''); // 移除可能的注释前缀
-    
-    // 根据 enabled 参数不同，查找条件不同
-    if ((enabled && line.trim().startsWith('//') && uncommentedLine.includes(rulePattern)) ||
-        (!enabled && !line.trim().startsWith('//') && line.includes(rulePattern))) {
-      
-      // 向上查找这条规则的开始 [
-      for (let j = i; j >= 0; j--) {
-        const currentLine = lines[j];
-        const trimmedLine = currentLine.trim();
-        const uncommentedCurrentLine = currentLine.replace(/^\s*\/\/\s*/, '').trim();
-        
-        // 寻找规则数组开始的标记 [
-        if ((enabled && trimmedLine.startsWith('//') && uncommentedCurrentLine.startsWith('[')) ||
-            (!enabled && !trimmedLine.startsWith('//') && trimmedLine.startsWith('['))) {
-          
-          // 确保这是规则的开始而不是 proxy 数组的开始
-          // 检查这是独立的 [ 而不是 proxy": [
-          if (!uncommentedCurrentLine.includes('proxy') && !uncommentedCurrentLine.includes(':')) {
-            startLine = j;
-            break;
-          }
-        }
-      }
-      
-      // 向下查找这条规则的结束 ]
-      if (startLine !== -1) {
-        bracketCount = 0;
-        
-        for (let j = startLine; j < lines.length; j++) {
-          const currentLine = lines[j];
-          const trimmedLine = currentLine.trim();
-          const uncommentedLine = currentLine.replace(/^\s*\/\/\s*/, '').trim();
-          
-          // 计算括号的嵌套
-          // 需要考虑注释和未注释行的情况
-          if (enabled) {
-            // 查找注释行中的括号
-            if (trimmedLine.startsWith('//')) {
-              for (let k = 0; k < uncommentedLine.length; k++) {
-                if (uncommentedLine[k] === '[') bracketCount++;
-                if (uncommentedLine[k] === ']') bracketCount--;
-              }
-            }
-          } else {
-            // 查找非注释行中的括号
-            if (!trimmedLine.startsWith('//')) {
-              for (let k = 0; k < trimmedLine.length; k++) {
-                if (trimmedLine[k] === '[') bracketCount++;
-                if (trimmedLine[k] === ']') bracketCount--;
-              }
-            }
-          }
-          
-          // 找到了结束括号
-          if (bracketCount <= 0) {
-            if ((enabled && trimmedLine.startsWith('//') && uncommentedLine.includes(']')) ||
-                (!enabled && !trimmedLine.startsWith('//') && trimmedLine.includes(']'))) {
-              endLine = j;
-              break;
-            }
-          }
-        }
-        
-        // 找到了目标规则，跳出循环
-        if (endLine !== -1) break;
-      }
-    }
+
+  // 找到proxy数组的开始位置
+  const proxyStartIndex = lines.findIndex(line => line.includes('"proxy"'));
+  if (proxyStartIndex === -1) {
+    throw new Error('Proxy array not found');
   }
-  
-  // 如果没找到精确的规则位置，尝试更宽松的匹配方式
-  if (startLine === -1 || endLine === -1) {
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const uncommentedLine = line.replace(/^\s*\/\/\s*/, '');
-      
-      // 根据 enabled 参数不同，查找条件不同
-      if ((enabled && line.trim().startsWith('//') && uncommentedLine.includes(rulePattern)) ||
-          (!enabled && !line.trim().startsWith('//') && line.includes(rulePattern))) {
-          
-        // 查找附近几行是否包含目标值
-        for (let j = i; j < Math.min(i + 5, lines.length); j++) {
-          const targetLine = lines[j];
-          const uncommentedTargetLine = targetLine.replace(/^\s*\/\/\s*/, '');
-          
-          if ((enabled && targetLine.trim().startsWith('//') && uncommentedTargetLine.includes(ruleTarget)) ||
-              (!enabled && !targetLine.trim().startsWith('//') && targetLine.includes(ruleTarget))) {
-            
-            // 查找规则开始 [
-            for (let k = i; k >= Math.max(0, i - 5); k--) {
-              const bracketLine = lines[k];
-              const uncommBracketLine = bracketLine.replace(/^\s*\/\/\s*/, '').trim();
-              
-              if ((enabled && bracketLine.trim().startsWith('//') && uncommBracketLine.startsWith('[')) ||
-                  (!enabled && !bracketLine.trim().startsWith('//') && bracketLine.trim().startsWith('['))) {
-                startLine = k;
-                break;
-              }
-            }
-            
-            // 查找规则结束 ]
-            for (let k = j; k < Math.min(j + 5, lines.length); k++) {
-              const bracketLine = lines[k];
-              const uncommBracketLine = bracketLine.replace(/^\s*\/\/\s*/, '').trim();
-              
-              if ((enabled && bracketLine.trim().startsWith('//') && uncommBracketLine.startsWith(']')) ||
-                  (!enabled && !bracketLine.trim().startsWith('//') && bracketLine.trim().startsWith(']'))) {
-                endLine = k;
-                break;
-              }
-            }
-            
-            break;
-          }
-        }
-        
-        if (startLine !== -1 && endLine !== -1) break;
-      }
-    }
+
+  // 查找目标规则
+  const range = findRuleRange(lines, ruleId, proxyStartIndex);
+  if (!range) {
+    throw new Error(`Rule with ID ${ruleId} not found`);
   }
-  
-  if (startLine === -1 || endLine === -1) {
-    return jsoncContent; // 未找到匹配的规则
-  }
-  
-  // 根据 enabled 参数处理找到的规则
-  for (let i = startLine; i <= endLine; i++) {
-    if (enabled) {
-      // 移除注释
-      if (lines[i].trim().startsWith('//')) {
-        lines[i] = lines[i].replace(/^\s*\/\/\s*/, '');
-      }
-    } else {
-      // 添加注释
-      if (!lines[i].trim().startsWith('//')) {
-        lines[i] = '// ' + lines[i];
-      }
-    }
-  }
-  
+
+  // 处理注释
+  processComments(lines, range, enabled);
+
   return lines.join('\n');
 };
-
-
-
-
-
-

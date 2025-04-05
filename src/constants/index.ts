@@ -61,6 +61,12 @@ export const PROXY_DATA: ProxyData = {
         target: 'https://test-api.example.com/users/',
         enabled: true,
       },
+      {
+        id: 2,
+        pattern: '(.*)/path1/path2/(.*)',
+        target: 'http://127.0.0.1:3000/$2',
+        enabled: false,
+      },
     ],
     jsonc: JSONC,
   },
