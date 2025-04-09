@@ -7,27 +7,28 @@ import {
   setProxyStatusChromeStorage,
 } from './chromeStorage';
 import { isDev } from '@/utils/env';
-import { PROXY_DATA } from '@/constants';
 import RequestForwardService from './requestForwardService';
+import { getModeProxy } from '@/service/proxy';
+import { ProxyMode } from '@/model/proxy';
+import { EDITOR_PROXY, TABLE_PROXY } from '@/constants';
+
 /**
  * 初始化数据
  * 如果localStorage 和 chromeStorage 都没有数据 则使用默认数据
  */
 export const initProxyData = async (): Promise<ProxyData> => {
-  const proxyLocalStorage = getProxyLocalStorage();
-
-  if (isDev()) {
-    return proxyLocalStorage || PROXY_DATA;
-  }
-  const proxyChromeStorage = await getProxyChromeStorage();
-
-  return proxyChromeStorage || PROXY_DATA;
+  const modeProxy = await getModeProxy();
+  const storageData = isDev() ? getProxyLocalStorage() : await getProxyChromeStorage();
+  const defaultData = modeProxy?.mode === ProxyMode.EDITOR ? EDITOR_PROXY : TABLE_PROXY;
+  
+  return storageData || defaultData;
 };
 
 /**
  * 更新本地存储数据
  */
 export const updateProxyData = (proxyData: ProxyData) => {
+
   if (isDev()) {
     setProxyLocalStorage(proxyData);
   } else {

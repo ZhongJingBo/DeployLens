@@ -1,16 +1,22 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import { JSONC } from '@/constants';
-import { ProxyState, proxyGroupStatus, ProxyData, ProxyAction } from '@/model/proxy';
-import { initProxyData, updateProxyData } from '../service';
+// 导入子逻辑模块的类型、Reducer 和初始状态
+import { TableStatePart, TableAction, tableReducer, initialTableStatePart } from './TableProxyLogic';
+import { EditorStatePart, EditorAction, editorReducer, initialEditorStatePart } from './EditorProxyLogic';
+// 导入服务函数
+import {
+  initProxyData,
+  updateProxyData,
+} from '../service';
+import { ProxyData } from '@/model/proxy';
 
-// 初始状态
+export type ProxyState = TableStatePart & EditorStatePart;
+export type ProxyAction = TableAction | EditorAction;
+
 const initialState: ProxyState = {
-  currentTab: 'default',
-  customTabs: [],
-  proxyData: {} as ProxyData,
+  ...initialTableStatePart,
+  ...initialEditorStatePart,
 };
 
-// Context
 const ProxyContext = createContext<
   | {
       state: ProxyState;
@@ -19,133 +25,98 @@ const ProxyContext = createContext<
   | undefined
 >(undefined);
 
-//  reducer
-const proxyReducer = (state: ProxyState, action: ProxyAction): ProxyState => {
-  switch (action.type) {
-    case 'SET_CURRENT_TAB':
-      return {
-        ...state,
-        currentTab: action.payload,
-      };
-    case 'INIT_PROXY_DATA':
-      return {
-        ...state,
-        proxyData: action.payload,
-      };
-    case 'ADD_CUSTOM_TAB':
-      const newProxyData = { ...state.proxyData };
-      const tabKey = String(action.payload);
-      delete newProxyData[tabKey];
-      newProxyData[tabKey] = {
-        key: tabKey,
-        group: tabKey,
-        groupEnabled: true,
-        groupStatus: proxyGroupStatus.INACTIVE,
-        rule: [
-          {
-            id: 1,
-            pattern: '^https://api.example.com/users/.*',
-            target: 'https://test-api.example.com/users/',
-            enabled: true,
-          },
-          {
-            id: 2,
-            pattern: '^https://api.example.com/users/.*',
-            target: 'https://test-api.example.com/users/',
-            enabled: true,
-          },
-        ],
-        jsonc: JSONC,
-      };
-      return {
-        ...state,
-        customTabs: [...state.customTabs, tabKey],
-        currentTab: tabKey,
-        proxyData: newProxyData,
-      };
-    // 删除tab
-    case 'DELETE_CUSTOM_TAB':
-      const { [action.payload]: removed, ...rest } = state.proxyData;
-      return {
-        ...state,
-        customTabs: state.customTabs.filter(tab => tab !== action.payload),
-        currentTab: state.currentTab === action.payload ? 'default' : state.currentTab,
-        proxyData: rest,
-      };
-    // 更新proxyData
-    case 'UPDATE_PROXY_DATA':
-      return {
-        ...state,
-        proxyData: {
-          ...state.proxyData,
-          [action.payload.key]: {
-            ...state.proxyData[action.payload.key],
-            rule: action.payload.data.rule,
-            jsonc: action.payload.data.jsonc,
-          },
-        },
-      };
-    // 切换tab状态
-    case 'TOGGLE_TAB_STATUS':
-      return {
-        ...state,
-        proxyData: {
-          ...state.proxyData,
-          [action.payload]: {
-            ...state.proxyData[action.payload],
-            groupStatus:
-              state.proxyData[action.payload].groupStatus === proxyGroupStatus.ACTIVE
-                ? proxyGroupStatus.INACTIVE
-                : proxyGroupStatus.ACTIVE,
-          },
-        },
-      };
-    default:
-      return state;
-  }
+const isTableAction = (action: ProxyAction): action is TableAction => {
+  const tableActionTypes = [
+    'INIT_TABLE_DATA',
+    'SET_CURRENT_TAB',
+    'ADD_CUSTOM_TAB',
+    'DELETE_CUSTOM_TAB',
+    'UPDATE_TABLE_TAB_DATA',
+    'TOGGLE_TABLE_TAB_STATUS'
+  ];
+  return tableActionTypes.includes(action.type);
 };
 
-//  Provider 组件
+
+const isEditorAction = (action: ProxyAction): action is EditorAction => {
+  const editorActionTypes = [
+    'INIT_EDITOR_DATA',
+    'SET_EDITOR_CONTENT'
+  ];
+  return editorActionTypes.includes(action.type);
+};
+
+//Reducer
+const proxyReducer = (state: ProxyState, action: ProxyAction): ProxyState => {
+  if (isTableAction(action)) {
+    const tableStateUpdate = tableReducer({
+      currentTab: state.currentTab,
+      customTabs: state.customTabs,
+      tableProxyData: state.tableProxyData
+    }, action);
+    return { ...state, ...tableStateUpdate };
+  } else if (isEditorAction(action)) {
+    const editorStateUpdate = editorReducer({ editorProxyData: state.editorProxyData }, action);
+    return { ...state, ...editorStateUpdate };
+  }
+
+  return state;
+};
+
+//Provider 组件
 export const ProxyProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(proxyReducer, initialState);
 
+  // 加载初始数据 (表格和编辑器) - 逻辑不变
   useEffect(() => {
     initProxyData().then(data => {
-      if (data) {
-        dispatch({ type: 'INIT_PROXY_DATA', payload: data });
+      if (data && Object.keys(data).length > 0) {
+        dispatch({ type: 'INIT_TABLE_DATA', payload: data as ProxyData });
       }
-    });
+    }).catch(error => console.error("初始化表格代理数据失败:", error));
+
+    initProxyData().then(data => {
+      if (data && Object.keys(data).length > 0) {
+        dispatch({ type: 'INIT_EDITOR_DATA', payload: data as ProxyData });
+      }
+    }).catch(error => console.error("初始化编辑器代理数据失败:", error));
   }, []);
 
-  // 监听state.proxyData的变化
+  // 监听并保存表格数据的变化 - 逻辑不变
   useEffect(() => {
-    if (Object.keys(state.proxyData).length > 0) {
-      updateProxyData(state.proxyData);
+    if (Object.keys(state.tableProxyData).length > 0) {
+      updateProxyData({
+          // 确保只传递 ProxyData 部分给服务函数
+          ...state.tableProxyData
+      });
     }
-  }, [state.proxyData]);
+  }, [state.tableProxyData]);
+
+  // 监听并保存编辑器数据的变化 - 逻辑不变
+  useEffect(() => {
+    if (state.editorProxyData !== initialEditorStatePart.editorProxyData) {
+
+      // 处理成为 ProxyData 类型
+       updateProxyData(state.editorProxyData);
+    }
+  }, [state.editorProxyData]);
 
   return <ProxyContext.Provider value={{ state, dispatch }}>{children}</ProxyContext.Provider>;
 };
 
-//  hook
+// --- 统一的 Hook ---
 export const useProxy = () => {
   const context = useContext(ProxyContext);
   if (context === undefined) {
-    throw new Error('useProxy must be used within a ProxyProvider');
+    throw new Error('useProxy 必须在 ProxyProvider 内部使用');
   }
   return context;
 };
 
-
-
-
 /**
- * 分为两个provider
- * 1. 编辑器模式
- * 2. 表格模式
- * 
- * 数据源也存储为两份
- * 
- * 
- * 
-*/
+ * 采用单一 Provider (`ProxyProvider`) 和单一 Context (`ProxyContext`)。
+ * 状态管理逻辑被拆分到：
+ * - `TableProxyLogic.ts` (处理表格和 Tab 相关状态)
+ * - `EditorProxyLogic.ts` (处理编辑器内容状态)
+ * 主 Reducer (`proxyReducer`) 将 Action 委托给相应的子 Reducer。
+ */

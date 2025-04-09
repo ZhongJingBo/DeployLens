@@ -51,7 +51,8 @@ export enum ProxyMode {
 export interface ProxyState {
   currentTab: string;
   customTabs: string[];
-  proxyData: ProxyData;
+  tableProxyData: ProxyData;
+  editorProxyData: string;
 }
 
 // 定义 action 类型

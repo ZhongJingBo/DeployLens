@@ -4,11 +4,12 @@ import { Button } from '@/components/ui';
 import { Plus, X } from 'lucide-react';
 import { ProxyProvider, useProxy } from './context/ProxyContext';
 import Editor from './components/editor';
-import { proxyGroupStatus, ProxyMode } from '@/model/proxy';
+import { proxyGroupStatus, ProxyMode, ProxyRule } from '@/model/proxy';
 import { jsoncTransformProxyRule, commentProxyRuleById } from './utils';
 import SettingsComp from './components/settingsComp';
 import ProxyTable from './components/table';
 import { getModeProxy } from '@/service/proxy';
+
 const ProxyContent: React.FC = () => {
   const { state, dispatch } = useProxy();
   const [newTabName, setNewTabName] = useState('');
@@ -22,16 +23,17 @@ const ProxyContent: React.FC = () => {
     };
     fetchMode();
   }, []);
+
   const handleTabChange = (value: string) => {
     dispatch({ type: 'SET_CURRENT_TAB', payload: value });
   };
 
   const handleTabDoubleClick = (key: string) => {
-    dispatch({ type: 'TOGGLE_TAB_STATUS', payload: key });
-    // 更新 updateProxyData
+    dispatch({ type: 'TOGGLE_TABLE_TAB_STATUS', payload: key });
   };
+
   const getTabStatusColor = (key: string) => {
-    const status = state.proxyData[key]?.groupStatus;
+    const status = state.tableProxyData[key]?.groupStatus;
     if (!status) return '';
     return status === proxyGroupStatus.ACTIVE
       ? 'text-primary font-bold before:content-[""] before:absolute before:left-2 before:top-1/2 before:-translate-y-1/2 before:w-2 before:h-2 before:rounded-full before:bg-primary'
@@ -53,16 +55,29 @@ const ProxyContent: React.FC = () => {
   const editorUpdateChange = (jsonc: string) => {
     const rule = jsoncTransformProxyRule(jsonc);
 
-    dispatch({
-      type: 'UPDATE_PROXY_DATA',
-      payload: {
-        key: state.currentTab,
-        data: {
-          rule,
-          jsonc,
+    if (mode === ProxyMode.TABLE) {
+      dispatch({
+        type: 'UPDATE_TABLE_TAB_DATA',
+        payload: {
+          key: state.currentTab,
+          data: {
+            rule,
+          },
         },
-      },
-    });
+      });
+    } else {
+      dispatch({
+        type: 'SET_EDITOR_CONTENT',
+        payload: {
+          ...state.editorProxyData,
+          [state.currentTab]: {
+            ...state.editorProxyData[state.currentTab],
+            jsonc,
+            rule,
+          },
+        },
+      });
+    }
   };
 
   const handleModeChange = (mode: ProxyMode) => {
@@ -70,23 +85,26 @@ const ProxyContent: React.FC = () => {
   };
 
   const handleRuleStatusChange = (ruleId: number, enabled: boolean) => {
-    const newData = { ...state.proxyData };
+    const newData = { ...state.tableProxyData };
     const currentTabData = { ...newData[state.currentTab] };
-    const updatedRules = currentTabData.rule.map(rule =>
+    const updatedRules = currentTabData.rule.map((rule: ProxyRule) =>
       rule.id === ruleId ? { ...rule, enabled } : rule
     );
-    const commentedJsonc = commentProxyRuleById(ruleId, currentTabData.jsonc || '' ,enabled );
-    console.log('commentedJsonc', commentedJsonc);
+
+
     dispatch({
-      type: 'UPDATE_PROXY_DATA',
+      type: 'UPDATE_TABLE_TAB_DATA',
       payload: {
         key: state.currentTab,
         data: {
           rule: updatedRules,
-          jsonc: commentedJsonc || '',
         },
       },
     });
+  };
+
+  const getCurrentData = () => {
+    return mode === ProxyMode.TABLE ? state.tableProxyData : state.editorProxyData;
   };
 
   return (
@@ -107,7 +125,7 @@ const ProxyContent: React.FC = () => {
       >
         <TabsList className="flex w-full items-center h-10">
           <div className="flex-1 flex overflow-x-auto scrollbar-hide h-full">
-            {Object.keys(state.proxyData).map(key => (
+            {Object.keys(getCurrentData()).map(key => (
               <TabsTrigger
                 key={key}
                 value={key}
@@ -170,12 +188,12 @@ const ProxyContent: React.FC = () => {
           </div>
         </TabsList>
 
-        {Object.keys(state.proxyData).map(key => (
+        {Object.keys(getCurrentData()).map(key => (
           <TabsContent key={key} value={key}>
             {mode === ProxyMode.EDITOR ? (
-              <Editor value={state.proxyData[key].jsonc || ''} onChange={editorUpdateChange} />
+              <Editor value={getCurrentData()[key].jsonc || ''} onChange={editorUpdateChange} />
             ) : (
-              <ProxyTable data={state.proxyData[key]} onRuleStatusChange={handleRuleStatusChange} />
+              <ProxyTable data={getCurrentData()[key]} onRuleStatusChange={handleRuleStatusChange} />
             )}
           </TabsContent>
         ))}
