@@ -38,6 +38,15 @@ export type ProxyData = {
   [key: string]: ProxyGroup;
 };
 
+
+
+export enum ProxyMode {
+  EDITOR = 'Editor',
+  TABLE = 'Table',
+}
+
+
+
 // 定义状态类型
 export interface ProxyState {
   currentTab: string;

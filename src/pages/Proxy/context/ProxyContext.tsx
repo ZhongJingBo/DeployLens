@@ -135,3 +135,17 @@ export const useProxy = () => {
   }
   return context;
 };
+
+
+
+
+/**
+ * 分为两个provider
+ * 1. 编辑器模式
+ * 2. 表格模式
+ * 
+ * 数据源也存储为两份
+ * 
+ * 
+ * 
+*/

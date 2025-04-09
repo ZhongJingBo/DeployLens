@@ -1,5 +1,5 @@
 import { ProxyRule } from '@/model/proxy';
-import { parseTree, ParseOptions, Node, visit, NodeType } from 'jsonc-parser';
+import { parseTree, ParseOptions, Node, visit } from 'jsonc-parser';
 /**
  * 移除 JSON 中的注释
  * @param str

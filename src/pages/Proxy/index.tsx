@@ -1,19 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState ,useEffect} from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { Plus, X } from 'lucide-react';
 import { ProxyProvider, useProxy } from './context/ProxyContext';
 import Editor from './components/editor';
-import { proxyGroupStatus } from '@/model/proxy';
+import { proxyGroupStatus, ProxyMode } from '@/model/proxy';
 import { jsoncTransformProxyRule, commentProxyRuleById } from './utils';
 import SettingsComp from './components/settingsComp';
 import ProxyTable from './components/table';
+import { getModeProxy } from '@/service/proxy';
 const ProxyContent: React.FC = () => {
   const { state, dispatch } = useProxy();
   const [newTabName, setNewTabName] = useState('');
   const [isAddingTab, setIsAddingTab] = useState(false);
-  const [mode, setMode] = useState<'table' | 'editor'>('table');
+  const [mode, setMode] = useState<ProxyMode>(ProxyMode.TABLE);
 
+  useEffect(() => {
+    const fetchMode = async () => {
+      const proxyData = await getModeProxy();
+      setMode(proxyData?.mode || ProxyMode.TABLE);
+    };
+    fetchMode();
+  }, []);
   const handleTabChange = (value: string) => {
     dispatch({ type: 'SET_CURRENT_TAB', payload: value });
   };
@@ -57,7 +65,7 @@ const ProxyContent: React.FC = () => {
     });
   };
 
-  const handleModeChange = (mode: 'table' | 'editor') => {
+  const handleModeChange = (mode: ProxyMode) => {
     setMode(mode);
   };
 
@@ -87,8 +95,7 @@ const ProxyContent: React.FC = () => {
         <h1 className="text-2xl font-bold mb-4">Proxy Settings</h1>
         <div className="flex items-center gap-2">
           <SettingsComp
-            modeChange={(value: 'table' | 'editor') => handleModeChange(value)}
-            mode={mode}
+            modeChange={(value: ProxyMode) => handleModeChange(value)}
           />
         </div>
       </div>
@@ -165,7 +172,7 @@ const ProxyContent: React.FC = () => {
 
         {Object.keys(state.proxyData).map(key => (
           <TabsContent key={key} value={key}>
-            {mode === 'editor' ? (
+            {mode === ProxyMode.EDITOR ? (
               <Editor value={state.proxyData[key].jsonc || ''} onChange={editorUpdateChange} />
             ) : (
               <ProxyTable data={state.proxyData[key]} onRuleStatusChange={handleRuleStatusChange} />

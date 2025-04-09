@@ -12,7 +12,7 @@ export interface RouteConfig {
 import ReplaceLink from '../pages/ReplaceLink';
 import Proxy from '../pages/Proxy';
 import SearchPage from '../pages/Search';
-import SettingsPage from '../pages/Settings';
+import SettingsPage from '../pages/settings';
 
 // Define routes configuration
 export const routes: RouteConfig[] = [
