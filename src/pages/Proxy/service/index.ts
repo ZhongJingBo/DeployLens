@@ -1,16 +1,10 @@
 import { ProxyData } from '@/model/proxy';
-import { setProxyLocalStorage, getProxyLocalStorage } from './localStorage';
-import {
-  setProxyChromeStorage,
-  getProxyChromeStorage,
-  getProxyStatusChromeStorage,
-  setProxyStatusChromeStorage,
-} from './chromeStorage';
-import { isDev } from '@/utils/env';
+import { storage } from '@/service/storage';
 import RequestForwardService from './requestForwardService';
 import { getModeProxy } from '@/service/proxy';
 import { ProxyMode } from '@/model/proxy';
-import { EDITOR_PROXY, TABLE_PROXY } from '@/constants';
+import { EDITOR_PROXY, TABLE_PROXY, CHFONE_STORE_PROXY_STATUS_KEY } from '@/constants';
+import { isDev } from '@/utils/env';
 
 /**
  * 初始化数据
@@ -18,22 +12,32 @@ import { EDITOR_PROXY, TABLE_PROXY } from '@/constants';
  */
 export const initProxyData = async (): Promise<ProxyData> => {
   const modeProxy = await getModeProxy();
-  const storageData = isDev() ? getProxyLocalStorage() : await getProxyChromeStorage();
-  const defaultData = modeProxy?.mode === ProxyMode.EDITOR ? EDITOR_PROXY : TABLE_PROXY;
+  const currentMode = modeProxy?.mode || ProxyMode.TABLE;
   
-  return storageData || defaultData;
+  // 获取存储的数据
+  const storageData = await storage.getProxyData(currentMode);
+    
+  // 如果存储中有数据，直接返回
+  if (storageData) {
+    return storageData;
+  }
+  
+  // 如果没有存储数据，使用对应模式的默认数据
+  return currentMode === ProxyMode.EDITOR ? EDITOR_PROXY : TABLE_PROXY;
 };
 
 /**
  * 更新本地存储数据
  */
-export const updateProxyData = (proxyData: ProxyData) => {
+export const updateProxyData = async (proxyData: ProxyData) => {
+  const modeProxy = await getModeProxy();
+  const currentMode = modeProxy?.mode || ProxyMode.TABLE;
+  
+  // 保存数据到存储
+  await storage.setProxyData(proxyData, currentMode);
 
-  if (isDev()) {
-    setProxyLocalStorage(proxyData);
-  } else {
-    setProxyChromeStorage(proxyData);
-    // 更新代理规则
+  // 在非开发环境下，更新Chrome代理规则
+  if (!isDev()) {
     RequestForwardService.updateChromeRules(RequestForwardService.statusFilter(proxyData));
   }
 };
@@ -42,13 +46,17 @@ export const updateProxyData = (proxyData: ProxyData) => {
  * 获取代理状态
  */
 export const getProxyStatus = async (): Promise<boolean> => {
-  const proxyStatus = await getProxyStatusChromeStorage();
-  return proxyStatus || false;
+  const proxyStatus = await storage.get<{ status: boolean }>(CHFONE_STORE_PROXY_STATUS_KEY);
+  return proxyStatus?.status || false;
 };
 
 /**
  * 设置代理状态
  */
 export const setProxyStatus = async (proxyStatus: boolean) => {
-  await setProxyStatusChromeStorage(proxyStatus);
+  const currentData = await storage.get<{ mode: ProxyMode; status: boolean }>(CHFONE_STORE_PROXY_STATUS_KEY);
+  await storage.set(CHFONE_STORE_PROXY_STATUS_KEY, {
+    mode: currentData?.mode || ProxyMode.TABLE,
+    status: proxyStatus
+  });
 };

@@ -1,7 +1,9 @@
 import { ProxyData, proxyGroupStatus, ProxyRule } from '@/model/proxy';
 import { eventBus } from '@/lib/event-bus';
 import { initProxyData, updateProxyData, getProxyStatus, setProxyStatus } from './index';
-
+import { getModeProxy } from '@/service/proxy';
+import { jsoncTransformProxyRule } from '@/pages/Proxy/utils';
+import { ProxyMode } from '@/model/proxy';
 export default class RequestForwardService {
   private static async clearAllRules() {
     try {
@@ -95,6 +97,18 @@ export default class RequestForwardService {
       
       // 3. 更新本地数据
       const proxyData = await initProxyData();
+      const modeProxy = await getModeProxy();
+      
+      // 如果是 editor 模式，需要将 jsonc 转换为规则
+      if (modeProxy?.mode === ProxyMode.EDITOR) {
+        const currentTab = Object.keys(proxyData)[0];
+        const jsonc = proxyData[currentTab]?.jsonc;
+        if (jsonc) {
+          const rules = jsoncTransformProxyRule(jsonc);
+          proxyData[currentTab].rule = rules;
+        }
+      }
+      
       await updateProxyData(proxyData);
       
       // 4. 通知UI更新
@@ -132,6 +146,18 @@ export default class RequestForwardService {
       
       // 2. 获取并过滤规则
       const proxyData = await initProxyData();
+      const modeProxy = await getModeProxy();
+      
+      // 如果是 editor 模式，需要将 jsonc 转换为规则
+      if (modeProxy?.mode === ProxyMode.EDITOR) {
+        const currentTab = Object.keys(proxyData)[0];
+        const jsonc = proxyData[currentTab]?.jsonc;
+        if (jsonc) {
+          const rules = jsoncTransformProxyRule(jsonc);
+          proxyData[currentTab].rule = rules;
+        }
+      }
+      
       const rules = this.statusFilter(proxyData);
       
       // 3. 更新规则

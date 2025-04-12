@@ -1,20 +1,23 @@
-import React, { useState ,useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui';
 import { Button } from '@/components/ui';
 import { Plus, X } from 'lucide-react';
 import { ProxyProvider, useProxy } from './context/ProxyContext';
 import Editor from './components/editor';
-import { proxyGroupStatus, ProxyMode, ProxyRule } from '@/model/proxy';
-import { jsoncTransformProxyRule, commentProxyRuleById } from './utils';
+import { proxyGroupStatus, ProxyMode, ProxyGroup } from '@/model/proxy';
+import { jsoncTransformProxyRule } from './utils';
 import SettingsComp from './components/settingsComp';
 import ProxyTable from './components/table';
 import { getModeProxy } from '@/service/proxy';
-
+import { initProxyData } from './service';
+import { eventBus } from '@/lib/event-bus';
+import QuickProxyTable from './components/quickProxyTable';
 const ProxyContent: React.FC = () => {
   const { state, dispatch } = useProxy();
   const [newTabName, setNewTabName] = useState('');
   const [isAddingTab, setIsAddingTab] = useState(false);
   const [mode, setMode] = useState<ProxyMode>(ProxyMode.TABLE);
+  const [showQuickProxyTable, setsShowQuickProxyTable] = useState(false);
 
   useEffect(() => {
     const fetchMode = async () => {
@@ -22,87 +25,134 @@ const ProxyContent: React.FC = () => {
       setMode(proxyData?.mode || ProxyMode.TABLE);
     };
     fetchMode();
+
+    // 监听模式改变事件
+    const handleModeChange = async (newMode: ProxyMode) => {
+      setMode(newMode);
+      try {
+        const proxyData = await initProxyData();
+        const actionType = newMode === ProxyMode.TABLE ? 'INIT_TABLE_DATA' : 'INIT_EDITOR_DATA';
+        dispatch({ type: actionType, payload: proxyData });
+      } catch (error) {
+        console.error('获取代理数据失败:', error);
+      }
+    };
+
+    eventBus.on('proxyModeChange', handleModeChange);
+
+    // 清理事件监听
+    return () => {
+      eventBus.off('proxyModeChange', handleModeChange);
+    };
   }, []);
 
+  /**
+   * 处理标签页改变
+   * @param value 标签页名称
+   */
   const handleTabChange = (value: string) => {
-    dispatch({ type: 'SET_CURRENT_TAB', payload: value });
+    const currentData = getCurrentData();
+    if (currentData && currentData[value]) {
+      const actionType =
+        mode === ProxyMode.TABLE ? 'SET_CURRENT_TAB_TABLE' : 'SET_CURRENT_TAB_EDITOR';
+      dispatch({ type: actionType, payload: value });
+    } else {
+      console.warn(`[ProxyContent] 标签页 "${value}" 不存在或未完全加载`);
+    }
   };
 
+  /**
+   * 处理标签页双击
+   * @param key 标签页名称
+   */
   const handleTabDoubleClick = (key: string) => {
-    dispatch({ type: 'TOGGLE_TABLE_TAB_STATUS', payload: key });
+    console.log('handleTabDoubleClick', key);
+    const actionType =
+      mode === ProxyMode.TABLE ? 'TOGGLE_TABLE_TAB_STATUS_TABLE' : 'TOGGLE_TABLE_TAB_STATUS_EDITOR';
+    dispatch({ type: actionType, payload: key });
+
+    console.log('state.tableProxyData', state);
   };
 
+  /**
+   * 获取标签页状态颜色
+   * @param key 标签页名称
+   * @returns 标签页状态颜色
+   */
   const getTabStatusColor = (key: string) => {
-    const status = state.tableProxyData[key]?.groupStatus;
+    const status =
+      mode === ProxyMode.TABLE
+        ? state.tableProxyData[key]?.groupStatus
+        : state.editorProxyData[key]?.groupStatus;
     if (!status) return '';
     return status === proxyGroupStatus.ACTIVE
       ? 'text-primary font-bold before:content-[""] before:absolute before:left-2 before:top-1/2 before:-translate-y-1/2 before:w-2 before:h-2 before:rounded-full before:bg-primary'
       : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground';
   };
 
+  /**
+   * 处理添加标签页
+   */
   const handleAddTab = () => {
     if (newTabName.trim()) {
-      dispatch({ type: 'ADD_CUSTOM_TAB', payload: newTabName.trim() });
+      const actionType =
+        mode === ProxyMode.TABLE ? 'ADD_CUSTOM_TAB_TABLE' : 'ADD_CUSTOM_TAB_EDITOR';
+      dispatch({ type: actionType, payload: newTabName.trim() });
       setNewTabName('');
       setIsAddingTab(false);
     }
   };
 
+  /**
+   * 处理删除标签页
+   * @param tabName 标签页名称
+   */
   const handleDeleteTab = (tabName: string) => {
-    dispatch({ type: 'DELETE_CUSTOM_TAB', payload: tabName });
+    const actionType =
+      mode === ProxyMode.TABLE ? 'DELETE_CUSTOM_TAB_TABLE' : 'DELETE_CUSTOM_TAB_EDITOR';
+    dispatch({ type: actionType, payload: tabName });
+    handleTabChange('default');
   };
 
+  /**
+   * 处理编辑器内容改变
+   * @param jsonc 编辑器内容
+   */
   const editorUpdateChange = (jsonc: string) => {
     const rule = jsoncTransformProxyRule(jsonc);
-
-    if (mode === ProxyMode.TABLE) {
-      dispatch({
-        type: 'UPDATE_TABLE_TAB_DATA',
-        payload: {
-          key: state.currentTab,
-          data: {
-            rule,
-          },
-        },
-      });
-    } else {
-      dispatch({
-        type: 'SET_EDITOR_CONTENT',
-        payload: {
-          ...state.editorProxyData,
-          [state.currentTab]: {
-            ...state.editorProxyData[state.currentTab],
-            jsonc,
-            rule,
-          },
-        },
-      });
-    }
-  };
-
-  const handleModeChange = (mode: ProxyMode) => {
-    setMode(mode);
-  };
-
-  const handleRuleStatusChange = (ruleId: number, enabled: boolean) => {
-    const newData = { ...state.tableProxyData };
-    const currentTabData = { ...newData[state.currentTab] };
-    const updatedRules = currentTabData.rule.map((rule: ProxyRule) =>
-      rule.id === ruleId ? { ...rule, enabled } : rule
-    );
-
-
     dispatch({
-      type: 'UPDATE_TABLE_TAB_DATA',
+      type: 'SET_EDITOR_CONTENT',
       payload: {
-        key: state.currentTab,
-        data: {
-          rule: updatedRules,
+        ...state.editorProxyData,
+        [state.currentTab]: {
+          ...state.editorProxyData[state.currentTab],
+          jsonc,
+          rule,
         },
       },
     });
   };
 
+  /**
+   * 处理规则状态改变
+   * @param data 更新后的完整数据
+   */
+  const handleRuleStatusChange = (data: ProxyGroup) => {
+    dispatch({
+      type: 'UPDATE_TABLE_TAB_DATA',
+      payload: {
+        key: state.currentTab,
+        data: {
+          rule: data.rule,
+        },
+      },
+    });
+  };
+
+  /**
+   * 获取当前数据
+   * @returns
+   */
   const getCurrentData = () => {
     return mode === ProxyMode.TABLE ? state.tableProxyData : state.editorProxyData;
   };
@@ -112,9 +162,7 @@ const ProxyContent: React.FC = () => {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold mb-4">Proxy Settings</h1>
         <div className="flex items-center gap-2">
-          <SettingsComp
-            modeChange={(value: ProxyMode) => handleModeChange(value)}
-          />
+          <SettingsComp mode={mode} setIsShowQuickProxyTable={setsShowQuickProxyTable} />
         </div>
       </div>
       <Tabs
@@ -193,7 +241,14 @@ const ProxyContent: React.FC = () => {
             {mode === ProxyMode.EDITOR ? (
               <Editor value={getCurrentData()[key].jsonc || ''} onChange={editorUpdateChange} />
             ) : (
-              <ProxyTable data={getCurrentData()[key]} onRuleStatusChange={handleRuleStatusChange} />
+              showQuickProxyTable ? (
+                <QuickProxyTable />
+              ) : (
+                <ProxyTable
+                  data={getCurrentData()[key]}
+                  onRuleStatusChange={handleRuleStatusChange}
+                />
+              )
             )}
           </TabsContent>
         ))}

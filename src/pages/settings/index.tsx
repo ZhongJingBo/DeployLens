@@ -3,6 +3,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { getModeProxy, setModeProxy } from '@/service/proxy';
 import { ProxyMode } from '@/model/proxy';
+import { eventBus } from '@/lib/event-bus';
+import RequestForwardService from '@/pages/Proxy/service/requestForwardService';
+
 const Settings: React.FC = () => {
   const [mode, setMode] = useState<ProxyMode>(ProxyMode.TABLE);
 
@@ -14,14 +17,23 @@ const Settings: React.FC = () => {
     fetchMode();
   }, []);
 
-  const handleModeChange = (value: ProxyMode) => {
-    setMode(value);
-    setModeProxy(value);
+  const handleModeChange = async (value: ProxyMode) => {
+    try {
+      // 先关闭代理
+      await RequestForwardService.closeProxy();
+      // 然后更新模式
+      setMode(value);
+      setModeProxy(value);
+      // 发出自定义事件
+      eventBus.emit('proxyModeChange', value);
+    } catch (error) {
+      console.error('Error switching proxy mode:', error);
+    }
   };
 
   return (
     <div className="container mx-auto p-4">
-      <h3 className="text-2xl font-bold mb-8 ">代理设置</h3>
+      <h3 className="text-2xl font-bold mb-8 ">设置</h3>
 
       <Card className="w-full max-w-3xl border-muted">
         <CardContent className="pt-6">

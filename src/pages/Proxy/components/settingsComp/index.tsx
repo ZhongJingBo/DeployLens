@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Switch, Label, Button } from '@/components/ui';
+import { Switch, Label, Button  } from '@/components/ui';
 import { getProxyStatus } from '@/pages/Proxy/service';
 import RequestForwardService from '@/pages/Proxy/service/requestForwardService';
 import { eventBus } from '@/lib/event-bus';
+import { Rocket } from 'lucide-react';
 import { ProxyMode } from '@/model/proxy';
 const SettingsComp: React.FC<{
-  modeChange: (value: ProxyMode) => void;
-}> = ({ modeChange }) => {
+  mode: ProxyMode,
+  setIsShowQuickProxyTable: (value: boolean) => void
+}> = ({ mode, setIsShowQuickProxyTable }) => {
   const [proxyStatus, setProxyStatus] = useState(false);
 
   useEffect(() => {
@@ -30,11 +32,17 @@ const SettingsComp: React.FC<{
 
   return (
     <div className="flex items-center gap-4 p-2">
+        {
+            mode === ProxyMode.TABLE && (
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setIsShowQuickProxyTable(true)}>
+                        <Rocket className="h-4 w-4 mr-0.5" />
+                          快速代理
+                    </Button>
+                </div>
+            )   
+        }
       <div className="flex items-center gap-2">
-        {/* <Button variant="outline" size="sm" onClick={() => modeChange(ProxyMode.QUICK_PROXY_TABLE)}>
-          <span>一键代理</span>
-        </Button> */}
-
         <Switch
           id="proxy-switch"
           checked={proxyStatus}

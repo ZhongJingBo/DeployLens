@@ -15,10 +15,7 @@ export const CHFONE_STORE_LINK_KEY = 'deploy_lens_chrome_store_link';
 
 //===================Proxy=============================
 
-/**
- * 代理数据 stroe key
- */
-export const CHFONE_STORE_PROXY_KEY = 'deploy_lens_chrome_store_proxy';
+
 /**
  * editor 模式 store key
 */
@@ -27,7 +24,6 @@ export const CHFONE_STORE_PROXY_EDITOR_KEY = 'deploy_lens_chrome_store_proxy_edi
  * table 模式 store key
 */
 export const CHFONE_STORE_PROXY_TABLE_KEY = 'deploy_lens_chrome_store_proxy_table';
-
 
 
 /**

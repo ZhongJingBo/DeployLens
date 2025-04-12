@@ -1,37 +1,35 @@
 /**
  * 代理公共service
  */
-import { CHFONE_STORE_PROXY_STATUS_KEY, CHFONE_STORE_LINK_KEY } from '@/constants';
-import { isDev } from '@/utils/env';
+import { ProxyMode } from '@/model/proxy';
+import { CHFONE_STORE_PROXY_STATUS_KEY } from '@/constants';
+import { storage } from './storage';
 
-export const getModeProxy = async () => {
-  if (isDev()) {
-    const proxyStatus = localStorage.getItem(CHFONE_STORE_LINK_KEY);
-    if (proxyStatus) {
-      return Promise.resolve(JSON.parse(proxyStatus));
-    }
-  } else {
-    const proxyStatus = await chrome.storage.local.get(CHFONE_STORE_PROXY_STATUS_KEY);
-    if (proxyStatus) {
-      return Promise.resolve(proxyStatus?.[CHFONE_STORE_PROXY_STATUS_KEY]);
-    }
-  }
-  return Promise.resolve({});
+/**
+ * 获取代理状态
+ */
+export const getProxyStatus = async (): Promise<boolean> => {
+  const proxyStatus = await chrome.storage.local.get(CHFONE_STORE_PROXY_STATUS_KEY);
+  return proxyStatus?.[CHFONE_STORE_PROXY_STATUS_KEY]?.status || false;
 };
 
-export const setModeProxy = (mode: string) => {
-  if (isDev()) {
-    const data = {
-      ...getModeProxy(),
-      mode,
-    };
-    localStorage.setItem(CHFONE_STORE_LINK_KEY, JSON.stringify(data));
-  } else {
-    chrome.storage.local.set({
-      [CHFONE_STORE_PROXY_STATUS_KEY]: {
-        ...getModeProxy(),
-        mode,
-      },
-    });
-  }
+/**
+ * 获取代理模式
+ */
+export const getModeProxy = async (): Promise<{ mode: ProxyMode } | null> => {
+  const proxyStatus = await storage.get<{ mode: ProxyMode; status: boolean }>(CHFONE_STORE_PROXY_STATUS_KEY);
+  return proxyStatus?.mode ? { mode: proxyStatus.mode } : null;
+};
+
+/**
+ * 设置代理模式
+ */
+export const setModeProxy = async (mode: ProxyMode) => {
+  const currentData = await storage.get<{ mode: ProxyMode; status: boolean }>(CHFONE_STORE_PROXY_STATUS_KEY);
+  const currentStatus = currentData?.status || false;
+  
+  await storage.set(CHFONE_STORE_PROXY_STATUS_KEY, {
+    mode,
+    status: currentStatus
+  });
 };

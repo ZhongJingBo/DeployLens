@@ -11,11 +11,11 @@ export interface TableStatePart {
 // (这些 Action 会被包含在 ProxyContext.tsx 的主 Action 类型中)
 export type TableAction =
   | { type: 'INIT_TABLE_DATA'; payload: ProxyData }
-  | { type: 'SET_CURRENT_TAB'; payload: string }
-  | { type: 'ADD_CUSTOM_TAB'; payload: string }
-  | { type: 'DELETE_CUSTOM_TAB'; payload: string }
+  | { type: 'SET_CURRENT_TAB_TABLE'; payload: string }
+  | { type: 'ADD_CUSTOM_TAB_TABLE'; payload: string }
+  | { type: 'DELETE_CUSTOM_TAB_TABLE'; payload: string }
   | { type: 'UPDATE_TABLE_TAB_DATA'; payload: { key: string; data: { rule: ProxyRule[] } } }
-  | { type: 'TOGGLE_TABLE_TAB_STATUS'; payload: string };
+  | { type: 'TOGGLE_TABLE_TAB_STATUS_TABLE'; payload: string };
 
 // --- 表格逻辑的初始状态 ---
 export const initialTableStatePart: TableStatePart = {
@@ -42,24 +42,29 @@ export const tableReducer = (state: TableStatePart, action: TableAction): TableS
                 currentTab: tableData[state.currentTab] ? state.currentTab : (loadedTabs.length > 0 ? loadedTabs[0] : 'default'),
             };
         }
-        case 'SET_CURRENT_TAB':
+        case 'SET_CURRENT_TAB_TABLE':
             if (typeof action.payload === 'string' && (state.tableProxyData[action.payload] || action.payload === 'default')) {
                  return { ...state, currentTab: action.payload };
             }
              console.warn(`[TableLogic] 尝试切换到不存在或无效的标签页: ${action.payload}`);
             return state;
 
-        case 'ADD_CUSTOM_TAB': {
+        case 'ADD_CUSTOM_TAB_TABLE': {
             const newTableProxyData = { ...state.tableProxyData };
             const tabKey = String(action.payload);
             if (newTableProxyData[tabKey]) {
                 console.warn(`[TableLogic] 标签页 "${tabKey}" 已存在.`);
                 return { ...state, currentTab: tabKey };
             }
-            newTableProxyData[tabKey] = {
-                key: tabKey, group: tabKey, groupEnabled: true, groupStatus: proxyGroupStatus.INACTIVE,
+            const newTabData = {
+                key: tabKey,
+                group: tabKey,
+                groupEnabled: true,
+                groupStatus: proxyGroupStatus.INACTIVE,
                 rule: [{ id: Date.now(), pattern: '^https://example.com/new/.*', target: 'http://localhost:8080/$1', enabled: true }],
             };
+            newTableProxyData[tabKey] = newTabData;
+            
             return {
                 ...state,
                 customTabs: [...state.customTabs, tabKey],
@@ -67,7 +72,7 @@ export const tableReducer = (state: TableStatePart, action: TableAction): TableS
                 tableProxyData: newTableProxyData,
             };
         }
-        case 'DELETE_CUSTOM_TAB': {
+        case 'DELETE_CUSTOM_TAB_TABLE': {
             const tabToDelete = action.payload;
             if (tabToDelete === 'default') return state;
             if (!state.tableProxyData[tabToDelete]) return state;
@@ -98,7 +103,7 @@ export const tableReducer = (state: TableStatePart, action: TableAction): TableS
                 },
             };
         }
-        case 'TOGGLE_TABLE_TAB_STATUS': {
+        case 'TOGGLE_TABLE_TAB_STATUS_TABLE': {
             const tabKey = action.payload;
             if (!state.tableProxyData[tabKey]) return state;
 
@@ -113,7 +118,6 @@ export const tableReducer = (state: TableStatePart, action: TableAction): TableS
                 },
             };
         }
-        // 注意：这个子 Reducer 不处理其他类型的 Action
         default:
             return state;
     }
