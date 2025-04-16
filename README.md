@@ -2,14 +2,13 @@
 
 # DeployLens (中文文档)
 
-DeployLens 是一个功能强大的 Chrome 浏览器扩展，它是一个属于前端的开发助手快速提升效率，用于快速代理该扩展采用现代 Web 技术构建。
+DeployLens 是一个功能强大的 Chrome 浏览器扩展，它是一个属于前端的开发助手快速提升效率，用于快速代理该扩展采用现代 Web 技术构建 ,基于Manifest V3实现。
 
 ## 特性
 
 - 🎯 侧边栏集成：通过 Chrome 侧边栏快速代理和访问编辑当前页面URL
-- 🔄 实时监控：实时跟踪部署状态和更新
 - 🛠️ 现代技术栈：使用 React、TypeScript 和 Vite 构建
-- 💅 精美界面：采用 Tailwind CSS 和 Radix UI 组件设计
+- 💅 精美界面：采用 Tailwind CSS 和 shadcn 组件设计
 - 🔒 安全可靠：实现适当的内容安全策略和权限管理
 
 ## 技术栈
@@ -18,7 +17,7 @@ DeployLens 是一个功能强大的 Chrome 浏览器扩展，它是一个属于�
 - TypeScript
 - Vite
 - Tailwind CSS
-- Radix UI 组件
+- shadcn UI 组件
 - Chrome 扩展 Manifest V3
 
 ## 开发指南
