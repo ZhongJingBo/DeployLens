@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import { getModeProxy } from '@/service/proxy';
 // 导入子逻辑模块的类型、Reducer 和初始状态
 import {
   TableStatePart,
@@ -14,7 +15,7 @@ import {
 } from './EditorProxyLogic';
 // 导入服务函数
 import { initProxyData, updateProxyData } from '../service';
-import { ProxyData } from '@/model/proxy';
+import { ProxyData, ProxyMode } from '@/model/proxy';
 
 export type ProxyState = TableStatePart & EditorStatePart;
 export type ProxyAction = TableAction | EditorAction;
@@ -86,6 +87,30 @@ const proxyReducer = (state: ProxyState, action: ProxyAction): ProxyState => {
 //Provider 组件
 export const ProxyProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, dispatch] = useReducer(proxyReducer, initialState);
+  const [currentMode, setCurrentMode] = React.useState<ProxyMode | undefined>();
+
+  // 监听模式变化
+  useEffect(() => {
+    const initMode = async () => {
+      const modeProxy = await getModeProxy();
+      setCurrentMode(modeProxy?.mode);
+    };
+    initMode();
+  }, []);
+
+  // 监听表格模式数据变化
+  useEffect(() => {
+    if (currentMode === ProxyMode.TABLE && Object.keys(state.tableProxyData).length > 0) {
+      updateProxyData(state.tableProxyData);
+    }
+  }, [currentMode, state.tableProxyData]);
+
+  // 监听编辑器模式数据变化
+  useEffect(() => {
+    if (currentMode === ProxyMode.EDITOR && state.editorProxyData !== initialEditorStatePart.editorProxyData) {
+      updateProxyData(state.editorProxyData);
+    }
+  }, [currentMode, state.editorProxyData]);
 
   // 加载初始数据 (表格和编辑器) - 逻辑不变
   useEffect(() => {
@@ -99,30 +124,13 @@ export const ProxyProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     initProxyData()
       .then(data => {
+        console.log('data111', data);
         if (data && Object.keys(data).length > 0) {
           dispatch({ type: 'INIT_EDITOR_DATA', payload: data as ProxyData });
         }
       })
       .catch(error => console.error('初始化编辑器代理数据失败:', error));
   }, []);
-
-  // 监听并保存表格数据的变化 - 逻辑不变
-  useEffect(() => {
-    if (Object.keys(state.tableProxyData).length > 0) {
-      updateProxyData({
-        // 确保只传递 ProxyData 部分给服务函数
-        ...state.tableProxyData,
-      });
-    }
-  }, [state.tableProxyData]);
-
-  // 监听并保存编辑器数据的变化 - 逻辑不变
-  useEffect(() => {
-    if (state.editorProxyData !== initialEditorStatePart.editorProxyData) {
-      // 处理成为 ProxyData 类型
-      updateProxyData(state.editorProxyData);
-    }
-  }, [state.editorProxyData]);
 
   return <ProxyContext.Provider value={{ state, dispatch }}>{children}</ProxyContext.Provider>;
 };

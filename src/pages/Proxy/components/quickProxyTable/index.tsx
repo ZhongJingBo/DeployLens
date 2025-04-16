@@ -9,19 +9,34 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Pencil, Check, X } from 'lucide-react';
+import {ProxyRule} from '@/model/proxy'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface ScriptInfo {
   src: string;
+  target: string;
   type?: string;
   async?: boolean;
   defer?: boolean;
 }
 
-const QuickProxyTable: React.FC = () => {
+const QuickProxyTable: React.FC<{
+  onProxyChange: (proxyRules: ProxyRule[]) => void;
+}> = ({ onProxyChange }) => {
   const [scripts, setScripts] = useState<ScriptInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentTabId, setCurrentTabId] = useState<number | null>(null);
   const [selectedScripts, setSelectedScripts] = useState<Set<number>>(new Set());
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingScript, setEditingScript] = useState<ScriptInfo | null>(null);
 
   const getCurrentTabScripts = async () => {
     try {
@@ -36,7 +51,7 @@ const QuickProxyTable: React.FC = () => {
 
       setCurrentTabId(tab.id);
 
-      // 尝试注入内容脚本
+      // 注入内容脚本
       try {
         await chrome.scripting.executeScript({
           target: { tabId: tab.id },
@@ -54,10 +69,13 @@ const QuickProxyTable: React.FC = () => {
         return;
       }
 
-      // 过滤掉所有的 Inline Script
-      const filteredScripts = response.filter(
-        (script: ScriptInfo) => script.src !== 'inline script'
-      );
+      // 过滤掉所有的 Inline Script，并为每个脚本添加初始 target
+      const filteredScripts = response
+        .filter((script: ScriptInfo) => script.src !== 'inline script')
+        .map((script: ScriptInfo) => ({
+          ...script,
+          target: script.src, // 初始时 target 与 src 相同
+        }));
       setScripts(filteredScripts);
       // 重置选中状态
       setSelectedScripts(new Set());
@@ -100,6 +118,8 @@ const QuickProxyTable: React.FC = () => {
     };
   }, [currentTabId]);
 
+
+
   const toggleAll = (checked: boolean | 'indeterminate') => {
     if (typeof checked === 'boolean') {
       if (checked) {
@@ -125,55 +145,193 @@ const QuickProxyTable: React.FC = () => {
   const isAllSelected = scripts.length > 0 && selectedScripts.size === scripts.length;
   const isPartiallySelected = selectedScripts.size > 0 && selectedScripts.size < scripts.length;
 
+  const handleEdit = (index: number) => {
+    setEditingIndex(index);
+    setEditingScript({ ...scripts[index] });
+  };
+
+  const handleSave = () => {
+    if (editingIndex !== null && editingScript) {
+      const newScripts = [...scripts];
+      newScripts[editingIndex] = editingScript;
+      setScripts(newScripts);
+      setEditingIndex(null);
+      setEditingScript(null);
+    }
+  };
+
+  const handleCancel = () => {
+    setEditingIndex(null);
+    setEditingScript(null);
+  };
+
+  const handleConfirmProxy = () => {
+    const selectedScriptsList = Array.from(selectedScripts).map((index) => {
+      const script = scripts[index];
+      const proxyRule: ProxyRule = {
+        id: Math.floor(Date.now() / 1000) * 1000 + index, // 使用秒级时间戳乘以1000加上索引，确保是整数
+        pattern: script.src,
+        target: script.target,
+        enabled: true
+      };
+      return proxyRule;
+    });
+    onProxyChange(selectedScriptsList);
+  };
+
   return (
-    <div className="container mx-auto p-4">
-      <ScrollArea className="h-[500px]">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[50px]">
-                <Checkbox
-                  checked={isAllSelected}
-                  disabled={scripts.length === 0}
-                  onCheckedChange={toggleAll}
-                  className="translate-y-[2px]"
-                  data-state={isAllSelected ? "checked" : isPartiallySelected ? "indeterminate" : "unchecked"}
-                />
-              </TableHead>
-              <TableHead>Source</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {scripts.map((script, index) => (
-              <TableRow key={index}>
-                <TableCell>
+    <div className="w-full">
+      <div className="min-w-[350px] w-full rounded-lg border border-border/40 shadow-md text-[13px] relative">
+        <ScrollArea className="h-[500px]">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/60 hover:bg-muted/60">
+                <TableHead className="w-[60px] text-center font-semibold whitespace-nowrap">
                   <Checkbox
-                    checked={selectedScripts.has(index)}
-                    onCheckedChange={(checked) => toggleScript(index, checked as boolean)}
+                    checked={isAllSelected}
+                    disabled={scripts.length === 0}
+                    onCheckedChange={toggleAll}
                     className="translate-y-[2px]"
+                    data-state={
+                      isAllSelected ? 'checked' : isPartiallySelected ? 'indeterminate' : 'unchecked'
+                    }
                   />
-                </TableCell>
-                <TableCell className="font-medium truncate max-w-[400px]" title={script.src}>
-                  {script.src === 'inline script' ? 'Inline Script' : script.src}
-                </TableCell>
+                </TableHead>
+                <TableHead className="w-[40%] font-semibold whitespace-nowrap">来源</TableHead>
+                <TableHead className="w-[40%] font-semibold whitespace-nowrap">目标</TableHead>
+                <TableHead className="w-[100px] text-right font-semibold whitespace-nowrap pr-4">操作</TableHead>
               </TableRow>
-            ))}
-            {scripts.length === 0 && !loading && (
-              <TableRow>
-                <TableCell colSpan={2} className="text-center py-4 text-muted-foreground">
-                  No scripts found
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </ScrollArea>
+            </TableHeader>
+            <TableBody className="relative">
+              {scripts.map((script, index) => (
+                <TableRow 
+                  key={index}
+                  className="hover:bg-muted/30 transition-colors duration-200"
+                >
+                  <TableCell className="py-2 px-2">
+                    <div className="flex justify-center items-center">
+                      <Checkbox
+                        checked={selectedScripts.has(index)}
+                        onCheckedChange={checked => toggleScript(index, checked as boolean)}
+                        className="translate-y-[2px]"
+                      />
+                    </div>
+                  </TableCell>
+                  <TableCell className="py-2 px-2 relative">
+                    {editingIndex === index ? (
+                      <Input
+                        value={editingScript?.src || ''}
+                        onChange={e =>
+                          setEditingScript(prev => (prev ? { ...prev, src: e.target.value } : null))
+                        }
+                        placeholder="输入来源地址"
+                        className="h-8 text-[13px]"
+                      />
+                    ) : (
+                      <TooltipProvider delayDuration={300}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="truncate text-[13px] absolute inset-y-0 left-0 right-0 py-2 px-2 flex items-center">
+                              {script.src}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-[400px] break-all">
+                            <p className="font-mono text-[13px]">{script.src}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </TableCell>
+                  <TableCell className="py-2 px-2 relative">
+                    {editingIndex === index ? (
+                      <Input
+                        value={editingScript?.target || ''}
+                        onChange={e =>
+                          setEditingScript(prev =>
+                            prev ? { ...prev, target: e.target.value } : null
+                          )
+                        }
+                        placeholder="输入目标地址"
+                        className="h-8 text-[13px]"
+                      />
+                    ) : (
+                      <TooltipProvider delayDuration={300}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="truncate text-[13px] absolute inset-y-0 left-0 right-0 py-2 px-2 flex items-center">
+                              {script.target}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-[400px] break-all">
+                            <p className="font-mono text-[13px]">{script.target}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                  </TableCell>
+                  <TableCell className="py-2 px-2">
+                    <div className="flex justify-end items-center gap-1 pr-4">
+                      {editingIndex === index ? (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={handleSave}
+                          >
+                            <Check className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6"
+                            onClick={handleCancel}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => handleEdit(index)}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {scripts.length === 0 && !loading && (
+                <TableRow>
+                  <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
+                    暂无可用的脚本
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </ScrollArea>
+      </div>
 
       {loading && (
-        <div className="flex justify-center items-center mt-4">
-          <div className="text-muted-foreground">Loading...</div>
+        <div className="flex justify-center items-center h-32">
+          <div className="text-muted-foreground animate-pulse">加载中...</div>
         </div>
       )}
+
+      <div className="flex justify-end items-center mt-4">
+        <Button
+          onClick={handleConfirmProxy}
+          disabled={selectedScripts.size === 0}
+          size="sm"
+          className="bg-primary text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-1"
+        >
+          确认代理 ({selectedScripts.size})
+        </Button>
+      </div>
     </div>
   );
 };

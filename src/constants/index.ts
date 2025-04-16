@@ -79,13 +79,13 @@ export const TABLE_PROXY: ProxyData = {
     groupStatus: proxyGroupStatus.ACTIVE,
     rule: [
       {
-        id: 0,
+        id: 1,
         pattern: '^https://api.example.com/users/.*111',
         target: 'https://test-api.example.com/users/',
         enabled: true,
       },
       {
-        id: 1,
+        id: 2,
         pattern: '^https://api.example.com/orders/.*',
         target: 'https://test-api.example.com/users/',
         enabled: true,

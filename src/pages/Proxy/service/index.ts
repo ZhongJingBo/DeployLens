@@ -16,7 +16,7 @@ export const initProxyData = async (): Promise<ProxyData> => {
   
   // 获取存储的数据
   const storageData = await storage.getProxyData(currentMode);
-    
+  console.log('storageData', storageData);
   // 如果存储中有数据，直接返回
   if (storageData) {
     return storageData;

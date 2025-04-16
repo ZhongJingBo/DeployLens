@@ -1,4 +1,4 @@
-import { ProxyData, proxyGroupStatus, ProxyRule } from '@/model/proxy';
+import { ProxyData, proxyGroupStatus, ProxyRule, ProxyGroup } from '@/model/proxy';
 import { eventBus } from '@/lib/event-bus';
 import { initProxyData, updateProxyData, getProxyStatus, setProxyStatus } from './index';
 import { getModeProxy } from '@/service/proxy';
@@ -20,14 +20,16 @@ export default class RequestForwardService {
   }
 
   private static async updateRules(rules: any[]) {
+    await this.clearAllRules();
+    if (rules?.length > 0) {
+      console.log('rules', rules);
+      this.updateBadge(rules.length);
+      await chrome.declarativeNetRequest.updateDynamicRules({
+        addRules: rules,
+      });
+    }
+    eventBus.emit('proxy-rules-updated', rules?.length || 0);
     try {
-      await this.clearAllRules();
-      if (rules.length > 0) {
-        await chrome.declarativeNetRequest.updateDynamicRules({
-          addRules: rules,
-        });
-      }
-      eventBus.emit('proxy-rules-updated', rules.length);
     } catch (error) {
       console.error('Error updating rules:', error);
       throw error;
@@ -46,8 +48,8 @@ export default class RequestForwardService {
     const rules = activeStatusGroup
       .flatMap(value => value[1]?.rule)
       .filter((rule: ProxyRule) => rule.enabled)
-      .map((rule: ProxyRule, index) => ({
-        id: index + 1,
+      .map((rule: ProxyRule, index: number) => ({
+        id: index + 1, // Use sequential integers starting from 1
         priority: 1,
         action: {
           type: 'redirect',
@@ -79,6 +81,7 @@ export default class RequestForwardService {
   static async updateChromeRules(rules: any) {
     const proxyStatus = await getProxyStatus();
     if (!proxyStatus) {
+      this.updateBadge(0);
       return;
     }
     await this.updateRules(rules);
@@ -91,14 +94,14 @@ export default class RequestForwardService {
     try {
       // 1. 更新状态
       await setProxyStatus(false);
-      
+
       // 2. 清空所有规则
       await this.clearAllRules();
-      
+
       // 3. 更新本地数据
       const proxyData = await initProxyData();
       const modeProxy = await getModeProxy();
-      
+
       // 如果是 editor 模式，需要将 jsonc 转换为规则
       if (modeProxy?.mode === ProxyMode.EDITOR) {
         const currentTab = Object.keys(proxyData)[0];
@@ -108,9 +111,9 @@ export default class RequestForwardService {
           proxyData[currentTab].rule = rules;
         }
       }
-      
+
       await updateProxyData(proxyData);
-      
+
       // 4. 通知UI更新
       eventBus.emit('proxy-rules-updated', 0);
     } catch (error) {
@@ -143,11 +146,11 @@ export default class RequestForwardService {
     try {
       // 1. 更新状态
       await setProxyStatus(true);
-      
+
       // 2. 获取并过滤规则
       const proxyData = await initProxyData();
       const modeProxy = await getModeProxy();
-      
+
       // 如果是 editor 模式，需要将 jsonc 转换为规则
       if (modeProxy?.mode === ProxyMode.EDITOR) {
         const currentTab = Object.keys(proxyData)[0];
@@ -157,12 +160,12 @@ export default class RequestForwardService {
           proxyData[currentTab].rule = rules;
         }
       }
-      
+
       const rules = this.statusFilter(proxyData);
-      
+
       // 3. 更新规则
       await this.updateRules(rules);
-      
+
       // 4. 更新本地数据
       await updateProxyData(proxyData);
     } catch (error) {
@@ -180,8 +183,24 @@ export default class RequestForwardService {
     const currentStatus = await getProxyStatus();
     if (currentStatus) {
       await this.closeProxy();
+      // this.updateBadge(0);
     } else {
       await this.openProxy();
+      // this.updateBadge(await this.getProxyRulesCount());
     }
   }
+
+  // 更新扩展图标角标
+  static updateBadge = (count: number) => {
+    if (count > 0) {
+      // 设置文字颜色为白色
+      chrome.action.setBadgeTextColor({ color: '#FFFFFF' });
+      // 设置背景色
+      chrome.action.setBadgeBackgroundColor({ color: 'red' });
+      // 设置文字内容，使用空格来调整文字位置
+      chrome.action.setBadgeText({ text: ` ${count} ` });
+    } else {
+      chrome.action.setBadgeText({ text: '' });
+    }
+  };
 }

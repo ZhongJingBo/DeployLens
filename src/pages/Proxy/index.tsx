@@ -4,7 +4,7 @@ import { Button } from '@/components/ui';
 import { Plus, X } from 'lucide-react';
 import { ProxyProvider, useProxy } from './context/ProxyContext';
 import Editor from './components/editor';
-import { proxyGroupStatus, ProxyMode, ProxyGroup } from '@/model/proxy';
+import { proxyGroupStatus, ProxyMode, ProxyGroup, ProxyRule } from '@/model/proxy';
 import { jsoncTransformProxyRule } from './utils';
 import SettingsComp from './components/settingsComp';
 import ProxyTable from './components/table';
@@ -45,6 +45,10 @@ const ProxyContent: React.FC = () => {
       eventBus.off('proxyModeChange', handleModeChange);
     };
   }, []);
+
+
+
+
 
   /**
    * 处理标签页改变
@@ -154,7 +158,43 @@ const ProxyContent: React.FC = () => {
    * @returns
    */
   const getCurrentData = () => {
+
     return mode === ProxyMode.TABLE ? state.tableProxyData : state.editorProxyData;
+  };
+
+
+  const quickOnProxyChange = (proxyRules: ProxyRule[]) => {
+    setsShowQuickProxyTable(false);
+    
+    // 获取当前标签页的现有规则
+    const currentTabData = state.tableProxyData[state.currentTab];
+    const existingRules = currentTabData?.rule || [];
+    
+    // 处理新规则，去掉首尾空格
+    const processedRules = proxyRules.map(rule => ({
+      ...rule,
+      pattern: rule.pattern.trim(),
+      target: rule.target.trim()
+    }));
+
+    const mergedRules = [...existingRules];
+    processedRules.forEach(newRule => {
+      const existingRuleIndex = mergedRules.findIndex(rule => rule.pattern === newRule.pattern && rule.target === newRule.target);
+      if (existingRuleIndex === -1) {
+        // 如果规则不存在，添加到合并列表中
+        mergedRules.push({ ...newRule, id: Date.now() * 1000 + Math.floor(Math.random() * 1000) });
+      }
+    });
+
+    dispatch({
+      type: 'UPDATE_TABLE_TAB_DATA',
+      payload: {
+        key: state.currentTab,
+        data: {
+          rule: mergedRules,
+        },
+      },
+    });
   };
 
   return (
@@ -162,7 +202,7 @@ const ProxyContent: React.FC = () => {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold mb-4">Proxy Settings</h1>
         <div className="flex items-center gap-2">
-          <SettingsComp mode={mode} setIsShowQuickProxyTable={setsShowQuickProxyTable} />
+          <SettingsComp mode={mode} setIsShowQuickProxyTable={setsShowQuickProxyTable} showQuickProxyTable={showQuickProxyTable} />
         </div>
       </div>
       <Tabs
@@ -242,7 +282,7 @@ const ProxyContent: React.FC = () => {
               <Editor value={getCurrentData()[key].jsonc || ''} onChange={editorUpdateChange} />
             ) : (
               showQuickProxyTable ? (
-                <QuickProxyTable />
+                <QuickProxyTable onProxyChange={quickOnProxyChange} />
               ) : (
                 <ProxyTable
                   data={getCurrentData()[key]}
