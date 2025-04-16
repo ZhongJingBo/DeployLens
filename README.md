@@ -1,92 +1,12 @@
-# DeployLens
 
-DeployLens is a powerful Chrome browser extension that provides a convenient side panel interface for monitoring and managing deployments. Built with modern web technologies, it offers a seamless experience for developers to track their deployment processes.
-
-## Features
-
-- 🎯 Side Panel Integration: Quick access to deployment information through Chrome's side panel
-- 🔄 Real-time Monitoring: Track deployment status and updates in real-time
-- 🛠️ Modern Tech Stack: Built with React, TypeScript, and Vite
-- 💅 Beautiful UI: Styled with Tailwind CSS and Radix UI components
-- 🔒 Secure: Implements proper content security policies and permissions
-
-## Tech Stack
-
-- React 18
-- TypeScript
-- Vite
-- Tailwind CSS
-- Radix UI Components
-- Chrome Extension Manifest V3
-
-## Development
-
-### Prerequisites
-
-- Node.js (Latest LTS version recommended)
-- Chrome Browser (v116 or higher)
-
-### Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/DeployLens.git
-cd DeployLens
-```
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Start development server:
-```bash
-npm run dev
-```
-
-4. Build the extension:
-```bash
-npm run build
-```
-
-### Loading the Extension
-
-1. Open Chrome and navigate to `chrome://extensions/`
-2. Enable "Developer mode"
-3. Click "Load unpacked" and select the `dist` directory
-
-## Scripts
-
-- `npm run dev` - Start development server
-- `npm run build` - Build the extension
-- `npm run watch` - Build and watch for changes
-- `npm run lint` - Run ESLint
-- `npm run format` - Format code with Prettier
-
-## Permissions
-
-The extension requires the following permissions:
-- Side Panel access
-- Storage
-- Network Request handling
-- Active Tab access
-- Scripting
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-
-
----
 
 # DeployLens (中文文档)
 
-DeployLens 是一个功能强大的 Chrome 浏览器扩展，它提供了一个便捷的侧边栏界面，用于监控和管理部署流程。该扩展采用现代 Web 技术构建，为开发者提供流畅的部署跟踪体验。
+DeployLens 是一个功能强大的 Chrome 浏览器扩展，它是一个属于前端的开发助手快速提升效率，用于快速代理该扩展采用现代 Web 技术构建。
 
 ## 特性
 
-- 🎯 侧边栏集成：通过 Chrome 侧边栏快速访问部署信息
+- 🎯 侧边栏集成：通过 Chrome 侧边栏快速代理和访问编辑当前页面URL
 - 🔄 实时监控：实时跟踪部署状态和更新
 - 🛠️ 现代技术栈：使用 React、TypeScript 和 Vite 构建
 - 💅 精美界面：采用 Tailwind CSS 和 Radix UI 组件设计
